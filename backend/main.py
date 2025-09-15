@@ -10,7 +10,7 @@ import os
 from dotenv import load_dotenv
 
 from app.database import create_db_and_tables
-from app.routers import auth, users, classrooms, careers, finance, stocks
+from app.routers import auth, users, classrooms, careers, finance, stocks, properties, banking
 
 load_dotenv()
 
@@ -46,6 +46,8 @@ app.include_router(classrooms.router, prefix="/api/classrooms", tags=["classroom
 app.include_router(careers.router, prefix="/api/careers", tags=["careers"])
 app.include_router(finance.router, prefix="/api/finance", tags=["finance"])
 app.include_router(stocks.router, prefix="/api/stocks", tags=["stocks"])
+app.include_router(properties.router, prefix="/api/properties", tags=["properties"])
+app.include_router(banking.router, prefix="/api/banking", tags=["banking"])
 
 @app.get("/")
 async def root():
