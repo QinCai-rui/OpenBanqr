@@ -1,12 +1,13 @@
 """
-Stock market simulation routes
+Stock market routes with real-time data
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
-import random
+from typing import List, Dict
+import yfinance as yf
 from datetime import datetime
+import logging
 
 from ..database import get_db
 from ..models import User, Stock, Portfolio, StockHolding, Transaction
@@ -20,24 +21,105 @@ from ..schemas import (
 from ..auth import get_current_active_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-def simulate_stock_price_change(current_price: float) -> tuple[float, float, float]:
-    """Simulate daily stock price change"""
-    # Random walk with slight upward bias (realistic market simulation)
-    change_percent = random.gauss(0.001, 0.02)  # Mean 0.1% daily growth, 2% volatility
-    change_percent = max(-0.15, min(0.15, change_percent))  # Cap at ±15%
+# Popular stocks for the simulation
+STOCK_SYMBOLS = [
+    "AAPL", "GOOGL", "MSFT", "AMZN", "TSLA", "META", "NVDA", "BRK-B", 
+    "V", "UNH", "JNJ", "WMT", "JPM", "PG", "MA", "HD"
+]
+
+async def fetch_real_stock_data(symbol: str) -> Dict:
+    """Fetch real-time stock data from Yahoo Finance"""
+    try:
+        ticker = yf.Ticker(symbol)
+        info = ticker.info
+        hist = ticker.history(period="2d")
+        
+        if hist.empty:
+            return None
+            
+        current_price = hist['Close'].iloc[-1]
+        previous_close = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+        
+        daily_change = current_price - previous_close
+        daily_change_percent = (daily_change / previous_close) * 100 if previous_close != 0 else 0
+        
+        return {
+            "symbol": symbol,
+            "company_name": info.get("longName", f"{symbol} Corp"),
+            "current_price": round(float(current_price), 2),
+            "daily_change": round(float(daily_change), 2),
+            "daily_change_percent": round(float(daily_change_percent), 2),
+            "market_cap": info.get("marketCap"),
+            "dividend_yield": info.get("dividendYield", 0) * 100 if info.get("dividendYield") else 0
+        }
+    except Exception as e:
+        logger.error(f"Error fetching data for {symbol}: {e}")
+        return None
+
+@router.post("/initialize")
+async def initialize_stocks(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Initialize stock database with real stock data (admin/teacher only)"""
+    if not current_user.is_teacher:
+        raise HTTPException(status_code=403, detail="Only teachers can initialize stocks")
     
-    new_price = current_price * (1 + change_percent)
-    change_amount = new_price - current_price
+    # Clear existing stocks if requested
+    existing_count = db.query(Stock).count()
+    if existing_count == 0:
+        for symbol in STOCK_SYMBOLS:
+            stock_data = await fetch_real_stock_data(symbol)
+            if stock_data:
+                stock = Stock(
+                    symbol=stock_data["symbol"],
+                    company_name=stock_data["company_name"],
+                    current_price=stock_data["current_price"],
+                    daily_change=stock_data["daily_change"],
+                    daily_change_percent=stock_data["daily_change_percent"],
+                    market_cap=stock_data["market_cap"],
+                    dividend_yield=stock_data["dividend_yield"]
+                )
+                db.add(stock)
+        
+        db.commit()
+        return {"message": f"Initialized {len(STOCK_SYMBOLS)} stocks with real data"}
+    else:
+        background_tasks.add_task(update_all_stock_prices_background, db)
+        return {"message": f"Updated {existing_count} existing stocks"}
+
+async def update_all_stock_prices_background(db: Session):
+    """Background task to update all stock prices"""
+    stocks = db.query(Stock).all()
+    for stock in stocks:
+        stock_data = await fetch_real_stock_data(stock.symbol)
+        if stock_data:
+            stock.current_price = stock_data["current_price"]
+            stock.daily_change = stock_data["daily_change"]
+            stock.daily_change_percent = stock_data["daily_change_percent"]
+            stock.last_updated = datetime.utcnow()
     
-    return new_price, change_amount, change_percent * 100
+    # Update holdings and portfolios
+    holdings = db.query(StockHolding).all()
+    for holding in holdings:
+        holding.current_value = holding.shares * holding.stock.current_price
+    
+    portfolios = db.query(Portfolio).all()
+    for portfolio in portfolios:
+        total_stock_value = sum(holding.current_value for holding in portfolio.holdings)
+        portfolio.total_value = portfolio.cash_balance + total_stock_value
+    
+    db.commit()
 
 @router.get("/", response_model=List[StockSchema])
 async def list_stocks(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """List all available stocks"""
+    """List all available stocks with real-time data"""
     return db.query(Stock).all()
 
 @router.get("/{stock_id}", response_model=StockSchema)
@@ -57,36 +139,14 @@ async def get_stock(
 
 @router.post("/update-prices")
 async def update_stock_prices(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
-    """Simulate daily stock price updates"""
-    stocks = db.query(Stock).all()
-    updated_stocks = []
-    
-    for stock in stocks:
-        new_price, change_amount, change_percent = simulate_stock_price_change(stock.current_price)
-        
-        stock.current_price = round(new_price, 2)
-        stock.daily_change = round(change_amount, 2)
-        stock.daily_change_percent = round(change_percent, 2)
-        stock.last_updated = datetime.utcnow()
-        
-        updated_stocks.append(stock)
-    
-    # Update all stock holdings values
-    holdings = db.query(StockHolding).all()
-    for holding in holdings:
-        holding.current_value = holding.shares * holding.stock.current_price
-    
-    # Update portfolio totals
-    portfolios = db.query(Portfolio).all()
-    for portfolio in portfolios:
-        total_stock_value = sum(holding.current_value for holding in portfolio.holdings)
-        portfolio.total_value = portfolio.cash_balance + total_stock_value
-    
-    db.commit()
-    return {"message": f"Updated {len(updated_stocks)} stock prices"}
+    """Update stock prices with real-time data"""
+    background_tasks.add_task(update_all_stock_prices_background, db)
+    stocks_count = db.query(Stock).count()
+    return {"message": f"Updating {stocks_count} stock prices in background"}
 
 @router.get("/portfolio/me", response_model=PortfolioWithHoldings)
 async def get_my_portfolio(

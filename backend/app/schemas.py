@@ -6,6 +6,23 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
 
+# Career Application schemas
+class CareerApplicationBase(BaseModel):
+    career_id: int
+    cover_letter: Optional[str] = None
+
+class CareerApplicationCreate(CareerApplicationBase):
+    pass
+
+class CareerApplication(CareerApplicationBase):
+    id: int
+    user_id: int
+    status: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
 # User schemas
 class UserBase(BaseModel):
     email: EmailStr

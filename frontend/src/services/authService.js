@@ -79,6 +79,16 @@ export const careerService = {
   async getCareer(id) {
     const response = await api.get(`/careers/${id}`)
     return response.data
+  },
+
+  async applyToCareer(applicationData) {
+    const response = await api.post('/careers/apply', applicationData)
+    return response.data
+  },
+
+  async getMyApplications() {
+    const response = await api.get('/careers/applications/me')
+    return response.data
   }
 }
 
@@ -127,6 +137,11 @@ export const stockService = {
 
   async updatePrices() {
     const response = await api.post('/stocks/update-prices')
+    return response.data
+  },
+
+  async initializeStocks() {
+    const response = await api.post('/stocks/initialize')
     return response.data
   }
 }

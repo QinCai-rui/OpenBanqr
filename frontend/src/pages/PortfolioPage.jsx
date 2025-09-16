@@ -18,8 +18,11 @@ import {
   TableCell,
   TableBody,
   Chip,
+  Alert,
+  LinearProgress,
+  IconButton,
 } from '@mui/material'
-import { TrendingUp, TrendingDown } from '@mui/icons-material'
+import { TrendingUp, TrendingDown, Refresh } from '@mui/icons-material'
 import { stockService } from '../services/authService'
 import { useAuth } from '../context/AuthContext'
 
@@ -32,10 +35,15 @@ const PortfolioPage = () => {
   const [tradeType, setTradeType] = useState('buy')
   const [tradeForm, setTradeForm] = useState({ shares: '', price: '' })
   const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState(false)
+  const [lastUpdated, setLastUpdated] = useState(null)
 
   useEffect(() => {
     if (!user?.is_teacher) {
       loadData()
+      // Auto-refresh every 30 seconds
+      const interval = setInterval(refreshPrices, 30000)
+      return () => clearInterval(interval)
     } else {
       setLoading(false)
     }
@@ -49,10 +57,23 @@ const PortfolioPage = () => {
       ])
       setPortfolio(portfolioData)
       setStocks(stocksData)
+      setLastUpdated(new Date())
     } catch (error) {
       console.error('Failed to load portfolio data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const refreshPrices = async () => {
+    setUpdating(true)
+    try {
+      await stockService.updatePrices()
+      await loadData()
+    } catch (error) {
+      console.error('Failed to update prices:', error)
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -91,6 +112,22 @@ const PortfolioPage = () => {
     setOpenTrade(true)
   }
 
+  const calculateTradeValue = () => {
+    if (!tradeForm.shares || !tradeForm.price) return 0
+    return parseFloat(tradeForm.shares) * parseFloat(tradeForm.price)
+  }
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount)
+  }
+
+  const formatPercentage = (percent) => {
+    return `${percent >= 0 ? '+' : ''}${percent.toFixed(2)}%`
+  }
+
   if (user?.is_teacher) {
     return (
       <Container>
@@ -98,6 +135,7 @@ const PortfolioPage = () => {
           Portfolio
         </Typography>
         <Typography variant="body1" color="textSecondary">
+          Teachers can view the stock market but cannot trade.
           Teachers don't have investment portfolios. This section is for students to practice stock trading.
         </Typography>
       </Container>
@@ -106,9 +144,28 @@ const PortfolioPage = () => {
 
   return (
     <Container>
-      <Typography variant="h4" gutterBottom>
-        Investment Portfolio
-      </Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
+        <Typography variant="h4">
+          Investment Portfolio
+        </Typography>
+        <Box>
+          {lastUpdated && (
+            <Typography variant="body2" color="textSecondary" sx={{ mr: 2 }}>
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </Typography>
+          )}
+          <IconButton onClick={refreshPrices} disabled={updating}>
+            <Refresh />
+          </IconButton>
+        </Box>
+      </Box>
+
+      {updating && <LinearProgress sx={{ mb: 2 }} />}
+
+      <Alert severity="info" sx={{ mb: 3 }}>
+        📈 <strong>Real-time stock data!</strong> Stock prices are now fetched from live market data. 
+        Prices update automatically every 30 seconds or click refresh.
+      </Alert>
 
       {/* Portfolio Summary */}
       {portfolio && (
@@ -120,7 +177,7 @@ const PortfolioPage = () => {
                   Total Value
                 </Typography>
                 <Typography variant="h4">
-                  ${portfolio.total_value?.toFixed(2) || '0.00'}
+                  {formatCurrency(portfolio.total_value || 0)}
                 </Typography>
               </CardContent>
             </Card>
@@ -132,7 +189,7 @@ const PortfolioPage = () => {
                   Cash Balance
                 </Typography>
                 <Typography variant="h4">
-                  ${portfolio.cash_balance?.toFixed(2) || '0.00'}
+                  {formatCurrency(portfolio.cash_balance || 0)}
                 </Typography>
               </CardContent>
             </Card>
@@ -144,7 +201,7 @@ const PortfolioPage = () => {
                   Total Invested
                 </Typography>
                 <Typography variant="h4">
-                  ${portfolio.total_invested?.toFixed(2) || '0.00'}
+                  {formatCurrency(portfolio.total_invested || 0)}
                 </Typography>
               </CardContent>
             </Card>
@@ -157,6 +214,9 @@ const PortfolioPage = () => {
                 </Typography>
                 <Typography variant="h4">
                   {portfolio.holdings?.length || 0}
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Stocks owned
                 </Typography>
               </CardContent>
             </Card>
@@ -177,38 +237,61 @@ const PortfolioPage = () => {
                 <TableCell align="right">Shares</TableCell>
                 <TableCell align="right">Avg Price</TableCell>
                 <TableCell align="right">Current Price</TableCell>
-                <TableCell align="right">Value</TableCell>
+                <TableCell align="right">Market Value</TableCell>
+                <TableCell align="right">Gain/Loss</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {portfolio.holdings.map((holding) => (
-                <TableRow key={holding.id}>
-                  <TableCell>
-                    <Box>
-                      <Typography variant="subtitle1">
-                        {holding.stock.symbol}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        {holding.stock.company_name}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">{holding.shares}</TableCell>
-                  <TableCell align="right">${holding.average_price.toFixed(2)}</TableCell>
-                  <TableCell align="right">${holding.stock.current_price.toFixed(2)}</TableCell>
-                  <TableCell align="right">${holding.current_value.toFixed(2)}</TableCell>
-                  <TableCell align="right">
-                    <Button
-                      size="small"
-                      color="error"
-                      onClick={() => openTradeDialog(holding.stock, 'sell')}
-                    >
-                      Sell
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {portfolio.holdings.map((holding) => {
+                const gainLoss = (holding.stock.current_price - holding.average_price) * holding.shares
+                const gainLossPercent = ((holding.stock.current_price - holding.average_price) / holding.average_price) * 100
+                
+                return (
+                  <TableRow key={holding.id}>
+                    <TableCell>
+                      <Box>
+                        <Typography variant="subtitle1" fontWeight="bold">
+                          {holding.stock.symbol}
+                        </Typography>
+                        <Typography variant="body2" color="textSecondary">
+                          {holding.stock.company_name}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">{holding.shares}</TableCell>
+                    <TableCell align="right">{formatCurrency(holding.average_price)}</TableCell>
+                    <TableCell align="right">{formatCurrency(holding.stock.current_price)}</TableCell>
+                    <TableCell align="right">{formatCurrency(holding.current_value)}</TableCell>
+                    <TableCell align="right">
+                      <Box>
+                        <Typography 
+                          color={gainLoss >= 0 ? 'success.main' : 'error.main'}
+                          fontWeight="bold"
+                        >
+                          {formatCurrency(gainLoss)}
+                        </Typography>
+                        <Typography 
+                          variant="body2"
+                          color={gainLoss >= 0 ? 'success.main' : 'error.main'}
+                        >
+                          {formatPercentage(gainLossPercent)}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Button
+                        size="small"
+                        color="error"
+                        variant="outlined"
+                        onClick={() => openTradeDialog(holding.stock, 'sell')}
+                      >
+                        Sell
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </Box>
@@ -216,15 +299,17 @@ const PortfolioPage = () => {
 
       {/* Available Stocks */}
       <Typography variant="h5" gutterBottom>
-        Available Stocks
+        Stock Market - Real-time Prices
       </Typography>
+      
       <Table>
         <TableHead>
           <TableRow>
             <TableCell>Company</TableCell>
             <TableCell align="right">Price</TableCell>
-            <TableCell align="right">Change</TableCell>
+            <TableCell align="right">Daily Change</TableCell>
             <TableCell align="right">Dividend Yield</TableCell>
+            <TableCell align="right">Market Cap</TableCell>
             <TableCell align="right">Actions</TableCell>
           </TableRow>
         </TableHead>
@@ -233,7 +318,7 @@ const PortfolioPage = () => {
             <TableRow key={stock.id}>
               <TableCell>
                 <Box>
-                  <Typography variant="subtitle1">
+                  <Typography variant="subtitle1" fontWeight="bold">
                     {stock.symbol}
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
@@ -241,7 +326,11 @@ const PortfolioPage = () => {
                   </Typography>
                 </Box>
               </TableCell>
-              <TableCell align="right">${stock.current_price.toFixed(2)}</TableCell>
+              <TableCell align="right">
+                <Typography variant="h6">
+                  {formatCurrency(stock.current_price)}
+                </Typography>
+              </TableCell>
               <TableCell align="right">
                 <Box display="flex" alignItems="center" justifyContent="flex-end">
                   {stock.daily_change >= 0 ? (
@@ -249,15 +338,26 @@ const PortfolioPage = () => {
                   ) : (
                     <TrendingDown color="error" />
                   )}
-                  <Typography
-                    color={stock.daily_change >= 0 ? 'success.main' : 'error.main'}
-                    sx={{ ml: 1 }}
-                  >
-                    {stock.daily_change_percent.toFixed(2)}%
-                  </Typography>
+                  <Box sx={{ ml: 1 }}>
+                    <Typography
+                      color={stock.daily_change >= 0 ? 'success.main' : 'error.main'}
+                      fontWeight="bold"
+                    >
+                      {formatCurrency(stock.daily_change)}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      color={stock.daily_change >= 0 ? 'success.main' : 'error.main'}
+                    >
+                      {formatPercentage(stock.daily_change_percent)}
+                    </Typography>
+                  </Box>
                 </Box>
               </TableCell>
               <TableCell align="right">{stock.dividend_yield.toFixed(2)}%</TableCell>
+              <TableCell align="right">
+                {stock.market_cap ? `$${(stock.market_cap / 1e9).toFixed(1)}B` : 'N/A'}
+              </TableCell>
               <TableCell align="right">
                 <Button
                   size="small"
@@ -278,6 +378,17 @@ const PortfolioPage = () => {
           {tradeType === 'buy' ? 'Buy' : 'Sell'} {selectedStock?.symbol}
         </DialogTitle>
         <DialogContent>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="body1">
+              Current Price: {selectedStock && formatCurrency(selectedStock.current_price)}
+            </Typography>
+            {portfolio && tradeType === 'buy' && (
+              <Typography variant="body2" color="textSecondary">
+                Available Cash: {formatCurrency(portfolio.cash_balance)}
+              </Typography>
+            )}
+          </Box>
+          
           <TextField
             autoFocus
             margin="dense"
@@ -287,6 +398,7 @@ const PortfolioPage = () => {
             variant="outlined"
             value={tradeForm.shares}
             onChange={(e) => setTradeForm({ ...tradeForm, shares: e.target.value })}
+            inputProps={{ min: "0.01", step: "0.01" }}
           />
           <TextField
             margin="dense"
@@ -296,12 +408,19 @@ const PortfolioPage = () => {
             variant="outlined"
             value={tradeForm.price}
             onChange={(e) => setTradeForm({ ...tradeForm, price: e.target.value })}
+            inputProps={{ min: "0.01", step: "0.01" }}
           />
+          
           {tradeForm.shares && tradeForm.price && (
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
               <Typography variant="h6">
-                Total: ${(parseFloat(tradeForm.shares) * parseFloat(tradeForm.price)).toFixed(2)}
+                Total Transaction: {formatCurrency(calculateTradeValue())}
               </Typography>
+              {tradeType === 'buy' && portfolio && calculateTradeValue() > portfolio.cash_balance && (
+                <Typography variant="body2" color="error">
+                  Insufficient funds!
+                </Typography>
+              )}
             </Box>
           )}
         </DialogContent>
@@ -311,8 +430,13 @@ const PortfolioPage = () => {
             onClick={handleTrade} 
             variant="contained"
             color={tradeType === 'buy' ? 'primary' : 'error'}
+            disabled={
+              !tradeForm.shares || 
+              !tradeForm.price || 
+              (tradeType === 'buy' && portfolio && calculateTradeValue() > portfolio.cash_balance)
+            }
           >
-            {tradeType === 'buy' ? 'Buy' : 'Sell'}
+            {tradeType === 'buy' ? 'Buy' : 'Sell'} Shares
           </Button>
         </DialogActions>
       </Dialog>
