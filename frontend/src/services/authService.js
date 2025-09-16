@@ -131,4 +131,36 @@ export const stockService = {
   }
 }
 
+export const bankingService = {
+  async getAccounts() {
+    const response = await api.get('/banking/accounts')
+    return response.data
+  },
+
+  async getTransactions(accountId, limit = 10) {
+    const response = await api.get(`/banking/accounts/${accountId}/transactions?limit=${limit}`)
+    return response.data
+  },
+
+  async getCreditScore() {
+    const response = await api.get('/banking/credit-score')
+    return response.data
+  },
+
+  async getFinancialSummary() {
+    const response = await api.get('/banking/financial-summary')
+    return response.data
+  },
+
+  async getLoans() {
+    const response = await api.get('/banking/loans')
+    return response.data
+  },
+
+  async transfer(transferData) {
+    const response = await api.post('/banking/transfer', transferData)
+    return response.data
+  }
+}
+
 export default api

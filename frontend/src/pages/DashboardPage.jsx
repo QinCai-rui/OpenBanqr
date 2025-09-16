@@ -36,7 +36,7 @@ import {
   Group,
 } from '@mui/icons-material'
 import { useAuth } from '../context/AuthContext'
-import { financeService, stockService } from '../services/authService'
+import { financeService, stockService, bankingService } from '../services/authService'
 
 const DashboardPage = () => {
   const { user } = useAuth()
@@ -47,27 +47,11 @@ const DashboardPage = () => {
   const [lastSimulation, setLastSimulation] = useState(null)
   const [error, setError] = useState('')
   
-  // Mock data for enhanced dashboard
-  const [dashboardData, setDashboardData] = useState({
-    totalCash: 17500.75,
-    totalDebt: 5200.00,
-    creditScore: 742,
-    monthlyIncome: 4500.00,
-    monthlyExpenses: 3200.00,
-    savingsGoal: 25000,
-    currentSavings: 15000,
-    recentTransactions: [
-      { id: 1, description: "Salary Deposit", amount: 4500.00, type: "income", date: "2025-01-15" },
-      { id: 2, description: "Rent Payment", amount: -1200.00, type: "expense", date: "2025-01-14" },
-      { id: 3, description: "Grocery Store", amount: -156.32, type: "expense", date: "2025-01-13" },
-      { id: 4, description: "Investment Purchase", amount: -500.00, type: "investment", date: "2025-01-12" },
-    ],
-    notifications: [
-      { id: 1, type: "success", message: "Credit score increased by 8 points", icon: <TrendingUp /> },
-      { id: 2, type: "warning", message: "Credit card payment due in 3 days", icon: <Warning /> },
-      { id: 3, type: "info", message: "New investment opportunity available", icon: <Info /> },
-    ]
-  })
+  // Real financial data from API
+  const [bankingData, setBankingData] = useState(null)
+  const [recentTransactions, setRecentTransactions] = useState([])
+  const [creditScore, setCreditScore] = useState(null)
+  const [financialSummary, setFinancialSummary] = useState(null)
 
   useEffect(() => {
     loadData()
@@ -80,13 +64,31 @@ const DashboardPage = () => {
     }
 
     try {
-      const [profileData, portfolioData] = await Promise.all([
+      // Load all financial data in parallel
+      const [
+        profileData, 
+        portfolioData, 
+        accounts, 
+        creditScoreData, 
+        summary,
+        transactions
+      ] = await Promise.all([
         financeService.getFinancialProfile(),
         stockService.getPortfolio(),
+        bankingService.getAccounts(),
+        bankingService.getCreditScore(),
+        bankingService.getFinancialSummary(),
+        financeService.getTransactions(10) // Get last 10 transactions
       ])
+      
       setFinancialProfile(profileData)
       setPortfolio(portfolioData)
+      setBankingData(accounts)
+      setCreditScore(creditScoreData)
+      setFinancialSummary(summary)
+      setRecentTransactions(transactions)
     } catch (err) {
+      console.error('Failed to load dashboard data:', err)
       setError('Failed to load dashboard data')
     } finally {
       setLoading(false)
@@ -254,7 +256,7 @@ const DashboardPage = () => {
                 <Typography variant="h6">Total Cash</Typography>
               </Box>
               <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
-                ${dashboardData.totalCash.toLocaleString()}
+                ${financialSummary?.total_cash?.toLocaleString() || '0.00'}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.8 }}>
                 Across all accounts
@@ -271,7 +273,7 @@ const DashboardPage = () => {
                 <Typography variant="h6">Net Worth</Typography>
               </Box>
               <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
-                ${(dashboardData.totalCash - dashboardData.totalDebt).toLocaleString()}
+                ${financialSummary?.net_worth?.toLocaleString() || '0.00'}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.8 }}>
                 Assets - Liabilities
@@ -288,10 +290,10 @@ const DashboardPage = () => {
                 <Typography variant="h6">Credit Score</Typography>
               </Box>
               <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
-                {dashboardData.creditScore}
+                {creditScore?.score || 'N/A'}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                Very Good
+                {creditScore?.rating || 'No rating'}
               </Typography>
             </CardContent>
           </Card>
@@ -305,10 +307,10 @@ const DashboardPage = () => {
                 <Typography variant="h6">Monthly Income</Typography>
               </Box>
               <Typography variant="h3" sx={{ fontWeight: 'bold' }}>
-                ${dashboardData.monthlyIncome.toLocaleString()}
+                ${financialProfile?.monthly_income?.toLocaleString() || '0.00'}
               </Typography>
               <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                After tax
+                Current profile
               </Typography>
             </CardContent>
           </Card>
@@ -391,33 +393,42 @@ const DashboardPage = () => {
             <CardContent>
               <Typography variant="h6" gutterBottom>Recent Transactions</Typography>
               <List>
-                {dashboardData.recentTransactions.map((transaction, index) => (
-                  <React.Fragment key={transaction.id}>
-                    <ListItem>
-                      <ListItemIcon>
-                        <Avatar sx={{ 
-                          bgcolor: transaction.amount > 0 ? 'success.main' : 'error.main',
-                          width: 32, 
-                          height: 32 
-                        }}>
-                          {transaction.amount > 0 ? <TrendingUp /> : <TrendingDown />}
-                        </Avatar>
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={transaction.description}
-                        secondary={transaction.date}
-                      />
-                      <Typography 
-                        variant="h6" 
-                        color={transaction.amount > 0 ? 'success.main' : 'error.main'}
-                        sx={{ fontWeight: 'bold' }}
-                      >
-                        {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
-                      </Typography>
-                    </ListItem>
-                    {index < dashboardData.recentTransactions.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
+                {recentTransactions.length > 0 ? (
+                  recentTransactions.map((transaction, index) => (
+                    <React.Fragment key={transaction.id}>
+                      <ListItem>
+                        <ListItemIcon>
+                          <Avatar sx={{ 
+                            bgcolor: transaction.amount > 0 ? 'success.main' : 'error.main',
+                            width: 32, 
+                            height: 32 
+                          }}>
+                            {transaction.amount > 0 ? <TrendingUp /> : <TrendingDown />}
+                          </Avatar>
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={transaction.description || transaction.transaction_type}
+                          secondary={new Date(transaction.created_at || transaction.date).toLocaleDateString()}
+                        />
+                        <Typography 
+                          variant="h6" 
+                          color={transaction.amount > 0 ? 'success.main' : 'error.main'}
+                          sx={{ fontWeight: 'bold' }}
+                        >
+                          {transaction.amount > 0 ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
+                        </Typography>
+                      </ListItem>
+                      {index < recentTransactions.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <ListItem>
+                    <ListItemText
+                      primary="No recent transactions"
+                      secondary="Start making transactions to see them here"
+                    />
+                  </ListItem>
+                )}
               </List>
               <Button variant="text" fullWidth sx={{ mt: 1 }}>
                 View All Transactions
@@ -428,26 +439,30 @@ const DashboardPage = () => {
 
         {/* Sidebar */}
         <Grid item xs={12} md={4}>
-          {/* Savings Goal Progress */}
+          {/* Savings Progress */}
           <Card sx={{ mb: 3 }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>Savings Goal</Typography>
+              <Typography variant="h6" gutterBottom>Savings</Typography>
               <Box sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2">Emergency Fund</Typography>
+                  <Typography variant="body2">Current Savings</Typography>
                   <Typography variant="body2">
-                    ${dashboardData.currentSavings.toLocaleString()} / ${dashboardData.savingsGoal.toLocaleString()}
+                    ${financialProfile?.savings_balance?.toLocaleString() || '0.00'}
                   </Typography>
                 </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={(dashboardData.currentSavings / dashboardData.savingsGoal) * 100}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
+                {financialProfile?.savings_balance > 0 && (
+                  <>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={Math.min(100, (financialProfile.savings_balance / 10000) * 100)}
+                      sx={{ height: 8, borderRadius: 4 }}
+                    />
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                      Emergency fund progress
+                    </Typography>
+                  </>
+                )}
               </Box>
-              <Typography variant="body2" color="text.secondary">
-                {((dashboardData.currentSavings / dashboardData.savingsGoal) * 100).toFixed(0)}% complete
-              </Typography>
             </CardContent>
           </Card>
 
@@ -456,27 +471,81 @@ const DashboardPage = () => {
             <CardContent>
               <Typography variant="h6" gutterBottom>
                 <Notifications sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Notifications
+                Financial Insights
               </Typography>
               <List dense>
-                {dashboardData.notifications.map((notification) => (
-                  <ListItem key={notification.id} sx={{ px: 0 }}>
+                {/* Generate notifications based on real data */}
+                {creditScore && creditScore.score > 700 && (
+                  <ListItem sx={{ px: 0 }}>
                     <ListItemIcon sx={{ minWidth: 32 }}>
                       <Avatar sx={{ 
                         width: 24, 
                         height: 24,
-                        bgcolor: notification.type === 'success' ? 'success.main' : 
-                                notification.type === 'warning' ? 'warning.main' : 'info.main'
+                        bgcolor: 'success.main'
                       }}>
-                        {notification.icon}
+                        <CheckCircle />
                       </Avatar>
                     </ListItemIcon>
                     <ListItemText 
-                      primary={notification.message}
+                      primary={`Great credit score: ${creditScore.score}`}
                       primaryTypographyProps={{ variant: 'body2' }}
                     />
                   </ListItem>
-                ))}
+                )}
+                
+                {financialProfile && financialProfile.savings_balance > 0 && (
+                  <ListItem sx={{ px: 0 }}>
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <Avatar sx={{ 
+                        width: 24, 
+                        height: 24,
+                        bgcolor: 'info.main'
+                      }}>
+                        <TrendingUp />
+                      </Avatar>
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={`You have $${financialProfile.savings_balance.toLocaleString()} in savings`}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                    />
+                  </ListItem>
+                )}
+                
+                {portfolio && portfolio.total_value > 0 && (
+                  <ListItem sx={{ px: 0 }}>
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <Avatar sx={{ 
+                        width: 24, 
+                        height: 24,
+                        bgcolor: 'info.main'
+                      }}>
+                        <Assessment />
+                      </Avatar>
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={`Portfolio value: $${portfolio.total_value.toLocaleString()}`}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                    />
+                  </ListItem>
+                )}
+                
+                {(!creditScore || !financialProfile || !portfolio) && (
+                  <ListItem sx={{ px: 0 }}>
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <Avatar sx={{ 
+                        width: 24, 
+                        height: 24,
+                        bgcolor: 'warning.main'
+                      }}>
+                        <Info />
+                      </Avatar>
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Complete your financial profile to get personalized insights"
+                      primaryTypographyProps={{ variant: 'body2' }}
+                    />
+                  </ListItem>
+                )}
               </List>
             </CardContent>
           </Card>
@@ -485,34 +554,55 @@ const DashboardPage = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>Financial Health</Typography>
-              <Box sx={{ textAlign: 'center', mb: 2 }}>
-                <Typography variant="h2" color="success.main" sx={{ fontWeight: 'bold' }}>
-                  B+
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Above Average
-                </Typography>
-              </Box>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2">Debt-to-Income Ratio</Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={25}
-                  color="success"
-                  sx={{ height: 4, borderRadius: 2 }}
-                />
-                <Typography variant="caption" color="text.secondary">25% (Excellent)</Typography>
-              </Box>
-              <Box sx={{ mb: 1 }}>
-                <Typography variant="body2">Emergency Fund</Typography>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={60}
-                  color="warning"
-                  sx={{ height: 4, borderRadius: 2 }}
-                />
-                <Typography variant="caption" color="text.secondary">3.2 months (Good)</Typography>
-              </Box>
+              {creditScore ? (
+                <>
+                  <Box sx={{ textAlign: 'center', mb: 2 }}>
+                    <Typography variant="h2" color="success.main" sx={{ fontWeight: 'bold' }}>
+                      {creditScore.rating || 'N/A'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Credit Score: {creditScore.score}
+                    </Typography>
+                  </Box>
+                  {financialSummary && (
+                    <>
+                      <Box sx={{ mb: 1 }}>
+                        <Typography variant="body2">Cash Position</Typography>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={Math.min(100, (financialSummary.total_cash / 10000) * 100)}
+                          color="success"
+                          sx={{ height: 4, borderRadius: 2 }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          ${financialSummary.total_cash?.toLocaleString() || '0'}
+                        </Typography>
+                      </Box>
+                      <Box sx={{ mb: 1 }}>
+                        <Typography variant="body2">Net Worth</Typography>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={Math.min(100, Math.max(0, (financialSummary.net_worth / 50000) * 100))}
+                          color={financialSummary.net_worth > 0 ? "success" : "error"}
+                          sx={{ height: 4, borderRadius: 2 }}
+                        />
+                        <Typography variant="caption" color="text.secondary">
+                          ${financialSummary.net_worth?.toLocaleString() || '0'}
+                        </Typography>
+                      </Box>
+                    </>
+                  )}
+                </>
+              ) : (
+                <Box sx={{ textAlign: 'center', mb: 2 }}>
+                  <Typography variant="h2" color="warning.main" sx={{ fontWeight: 'bold' }}>
+                    --
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Build your credit history
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         </Grid>
