@@ -38,8 +38,9 @@ const Layout = () => {
   const studentMenuItems = [
     { text: 'Dashboard', icon: <Dashboard />, path: '/dashboard', description: 'Overview of your finances' },
     { text: 'Banking', icon: <AccountBalance />, path: '/banking', description: 'Accounts & credit score' },
-    { text: 'Property', icon: <Home />, path: '/property', description: 'Real estate & mortgages' },
+    { text: 'Houses', icon: <Home />, path: '/property', description: 'Real estate & mortgages' },
     { text: 'Investments', icon: <TrendingUp />, path: '/portfolio', description: 'Portfolio management' },
+    { text: 'Careers', icon: <Work />, path: '/careers', description: 'Career opportunities' },
   ]
 
   const teacherMenuItems = [

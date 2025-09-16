@@ -57,7 +57,15 @@ const PropertyPage = () => {
   })
   const [affordabilityResult, setAffordabilityResult] = useState(null)
   const [marketData, setMarketData] = useState(null)
-  const [propertyListings, setPropertyListings] = useState([])
+  const [houseListings, setHouseListings] = useState([])
+  const [userProperties, setUserProperties] = useState([])
+  const [searchFilters, setSearchFilters] = useState({
+    priceMin: 200000,
+    priceMax: 800000,
+    bedrooms: '',
+    bathrooms: '',
+    location: 'All Areas'
+  })
 
   useEffect(() => {
     if (!user?.is_teacher) {
@@ -76,8 +84,8 @@ const PropertyPage = () => {
         setMarketData(await response.json())
       }
     } catch (error) {
-      console.error('Failed to load market data:', error)
-      // Mock data for demo
+      console.error('Failed to load housing market data:', error)
+      // Mock data for demo - Real estate market
       setMarketData({
         location: "National",
         property_type: "single_family",
@@ -88,8 +96,68 @@ const PropertyPage = () => {
         median_days_on_market: 28,
         inventory_months: 2.8,
         average_interest_rate: 6.75,
-        market_temperature: "Hot"
+        market_temperature: "Seller's Market"
       })
+      
+      // Load sample house listings
+      setHouseListings([
+        {
+          id: 1,
+          address: "123 Maple Street, Suburbia",
+          price: 425000,
+          bedrooms: 3,
+          bathrooms: 2.5,
+          sqft: 2100,
+          type: "Single Family",
+          yearBuilt: 2018,
+          lotSize: "0.25 acres",
+          status: "For Sale",
+          daysOnMarket: 12,
+          description: "Beautiful modern home with open floor plan, updated kitchen, and spacious backyard."
+        },
+        {
+          id: 2,
+          address: "456 Oak Avenue, Downtown",
+          price: 650000,
+          bedrooms: 4,
+          bathrooms: 3,
+          sqft: 2800,
+          type: "Single Family",
+          yearBuilt: 2015,
+          lotSize: "0.18 acres",
+          status: "For Sale",
+          daysOnMarket: 5,
+          description: "Luxury home in prime location with high-end finishes and smart home features."
+        },
+        {
+          id: 3,
+          address: "789 Pine Road, Riverside",
+          price: 298000,
+          bedrooms: 2,
+          bathrooms: 2,
+          sqft: 1650,
+          type: "Townhouse",
+          yearBuilt: 2020,
+          lotSize: "N/A",
+          status: "For Sale",
+          daysOnMarket: 22,
+          description: "New construction townhouse with modern amenities and low maintenance living."
+        },
+        {
+          id: 4,
+          address: "321 Birch Lane, Hillside",
+          price: 750000,
+          bedrooms: 5,
+          bathrooms: 4,
+          sqft: 3500,
+          type: "Single Family",
+          yearBuilt: 2012,
+          lotSize: "0.45 acres",
+          status: "For Sale",
+          daysOnMarket: 35,
+          description: "Spacious family home with pool, finished basement, and three-car garage."
+        }
+      ])
     }
   }
 
@@ -230,7 +298,8 @@ const PropertyPage = () => {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
         <Alert severity="info">
-          Property features are only available for students to practice real estate and mortgage calculations.
+          🏠 Housing features are available for students to practice real estate investment, mortgage calculations, and home buying decisions. 
+          Students can explore house listings, calculate affordability, and learn about the home buying process.
         </Alert>
       </Container>
     )
@@ -241,10 +310,10 @@ const PropertyPage = () => {
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-          Property & Real Estate
+          🏠 Houses & Real Estate
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
-          Explore home affordability, mortgage calculations, and market insights
+          Find your dream home, calculate affordability, and explore mortgage options
         </Typography>
       </Box>
 
@@ -300,10 +369,10 @@ const PropertyPage = () => {
       {/* Main Content Tabs */}
       <Card>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={activeTab} onChange={handleTabChange} aria-label="property tabs">
-            <Tab label="Affordability Calculator" icon={<Calculate />} />
+          <Tabs value={activeTab} onChange={handleTabChange} aria-label="house tabs">
+            <Tab label="House Affordability" icon={<Calculate />} />
             <Tab label="Mortgage Calculator" icon={<AttachMoney />} />
-            <Tab label="Property Search" icon={<Search />} />
+            <Tab label="House Listings" icon={<Search />} />
             <Tab label="Market Analysis" icon={<Assessment />} />
           </Tabs>
         </Box>
@@ -574,57 +643,142 @@ const PropertyPage = () => {
           </CardContent>
         )}
 
-        {/* Property Search Tab */}
+        {/* House Listings Tab */}
         {activeTab === 2 && (
           <CardContent>
             <Typography variant="h6" gutterBottom>
-              Property Listings
+              🏠 Available Houses
             </Typography>
-            <Button 
-              variant="contained" 
-              onClick={searchProperties} 
-              sx={{ mb: 3 }}
-              startIcon={<Search />}
-            >
-              Search Properties
-            </Button>
             
-            {propertyListings.length > 0 && (
+            {/* Search Filters */}
+            <Card variant="outlined" sx={{ mb: 3, p: 2, bgcolor: '#f8f9fa' }}>
+              <Typography variant="subtitle1" gutterBottom>Search Filters</Typography>
               <Grid container spacing={2}>
-                {propertyListings.map((property) => (
-                  <Grid item xs={12} md={6} key={property.id}>
-                    <Card variant="outlined">
-                      <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                          <Typography variant="h6" color="primary">
-                            ${property.price?.toLocaleString()}
-                          </Typography>
-                          <Chip 
-                            label={`${property.days_on_market} days`} 
-                            size="small" 
-                            color={property.days_on_market < 30 ? "success" : "warning"}
-                          />
-                        </Box>
-                        <Typography variant="subtitle1" gutterBottom>
-                          {property.address}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" gutterBottom>
-                          {property.city}, {property.state}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                          <Typography variant="body2">{property.bedrooms} beds</Typography>
-                          <Typography variant="body2">{property.bathrooms} baths</Typography>
-                          <Typography variant="body2">{property.square_feet?.toLocaleString()} sqft</Typography>
-                        </Box>
-                        <Typography variant="body2" color="text.secondary">
-                          ${property.price_per_sqft}/sqft • Est. payment: ${property.estimated_payment?.toLocaleString()}/mo
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Min Price"
+                    type="number"
+                    value={searchFilters.priceMin}
+                    onChange={(e) => setSearchFilters({...searchFilters, priceMin: parseInt(e.target.value)})}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Max Price"
+                    type="number"
+                    value={searchFilters.priceMax}
+                    onChange={(e) => setSearchFilters({...searchFilters, priceMax: parseInt(e.target.value)})}
+                    InputProps={{
+                      startAdornment: <InputAdornment position="start">$</InputAdornment>,
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <FormControl fullWidth>
+                    <InputLabel>Bedrooms</InputLabel>
+                    <Select
+                      value={searchFilters.bedrooms}
+                      label="Bedrooms"
+                      onChange={(e) => setSearchFilters({...searchFilters, bedrooms: e.target.value})}
+                    >
+                      <MenuItem value="">Any</MenuItem>
+                      <MenuItem value="1">1+</MenuItem>
+                      <MenuItem value="2">2+</MenuItem>
+                      <MenuItem value="3">3+</MenuItem>
+                      <MenuItem value="4">4+</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <FormControl fullWidth>
+                    <InputLabel>Bathrooms</InputLabel>
+                    <Select
+                      value={searchFilters.bathrooms}
+                      label="Bathrooms"
+                      onChange={(e) => setSearchFilters({...searchFilters, bathrooms: e.target.value})}
+                    >
+                      <MenuItem value="">Any</MenuItem>
+                      <MenuItem value="1">1+</MenuItem>
+                      <MenuItem value="2">2+</MenuItem>
+                      <MenuItem value="3">3+</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <Button 
+                    variant="contained" 
+                    fullWidth
+                    startIcon={<Search />}
+                    sx={{ height: '56px' }}
+                  >
+                    Search
+                  </Button>
+                </Grid>
               </Grid>
-            )}
+            </Card>
+            
+            {/* House Listings */}
+            <Grid container spacing={3}>
+              {houseListings.map((house) => (
+                <Grid item xs={12} md={6} key={house.id}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                        <Typography variant="h5" color="primary" sx={{ fontWeight: 'bold' }}>
+                          ${house.price.toLocaleString()}
+                        </Typography>
+                        <Chip 
+                          label={`${house.daysOnMarket} days on market`} 
+                          size="small" 
+                          color={house.daysOnMarket < 15 ? "success" : house.daysOnMarket < 30 ? "warning" : "default"}
+                        />
+                      </Box>
+                      
+                      <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
+                        📍 {house.address}
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', gap: 3, mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>{house.bedrooms}</Typography>
+                          <Typography variant="body2" color="text.secondary">bed</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>{house.bathrooms}</Typography>
+                          <Typography variant="body2" color="text.secondary">bath</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Typography variant="body1" sx={{ fontWeight: 'bold' }}>{house.sqft.toLocaleString()}</Typography>
+                          <Typography variant="body2" color="text.secondary">sqft</Typography>
+                        </Box>
+                      </Box>
+                      
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        {house.type} • Built {house.yearBuilt} • {house.lotSize}
+                      </Typography>
+                      
+                      <Typography variant="body2" sx={{ mb: 2 }}>
+                        {house.description}
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body2" color="text.secondary">
+                          ${Math.round(house.price / house.sqft)}/sqft
+                        </Typography>
+                        <Button variant="contained" size="small">
+                          View Details
+                        </Button>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
           </CardContent>
         )}
 
