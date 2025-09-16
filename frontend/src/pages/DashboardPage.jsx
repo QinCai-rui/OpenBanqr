@@ -46,6 +46,28 @@ const DashboardPage = () => {
   const [simulationLoading, setSimulationLoading] = useState(false)
   const [lastSimulation, setLastSimulation] = useState(null)
   const [error, setError] = useState('')
+  
+  // Mock data for enhanced dashboard
+  const [dashboardData, setDashboardData] = useState({
+    totalCash: 17500.75,
+    totalDebt: 5200.00,
+    creditScore: 742,
+    monthlyIncome: 4500.00,
+    monthlyExpenses: 3200.00,
+    savingsGoal: 25000,
+    currentSavings: 15000,
+    recentTransactions: [
+      { id: 1, description: "Salary Deposit", amount: 4500.00, type: "income", date: "2025-01-15" },
+      { id: 2, description: "Rent Payment", amount: -1200.00, type: "expense", date: "2025-01-14" },
+      { id: 3, description: "Grocery Store", amount: -156.32, type: "expense", date: "2025-01-13" },
+      { id: 4, description: "Investment Purchase", amount: -500.00, type: "investment", date: "2025-01-12" },
+    ],
+    notifications: [
+      { id: 1, type: "success", message: "Credit score increased by 8 points", icon: <TrendingUp /> },
+      { id: 2, type: "warning", message: "Credit card payment due in 3 days", icon: <Warning /> },
+      { id: 3, type: "info", message: "New investment opportunity available", icon: <Info /> },
+    ]
+  })
 
   useEffect(() => {
     loadData()
@@ -85,35 +107,6 @@ const DashboardPage = () => {
       setSimulationLoading(false)
     }
   }
-
-  if (loading) {
-    return (
-      <Container>
-        <Box sx={{ width: '100%', mt: 2 }}>
-          <LinearProgress />
-        </Box>
-      </Container>
-    )
-  }
-
-  // Mock data for enhanced dashboard
-  const [dashboardData, setDashboardData] = useState({
-    totalCash: 17500.75,
-    totalDebt: 5200.00,
-    creditScore: 742,
-    monthlyIncome: 4500.00,
-    monthlyExpenses: 3200.00,
-    savingsGoal: 25000,
-    currentSavings: 15000,
-    recentTransactions: [
-      { id: 1, description: "Salary Deposit", amount: 4500.00, type: "income", date: "2025-01-15" },
-      { id: 2, description: "Rent Payment", amount: -1200.00, type: "expense", date: "2025-01-14" },
-      { id: 3, description: "Grocery Store", amount: -156.32, type: "expense", date: "2025-01-13" },
-      { id: 4, description: "Investment Purchase", amount: -500.00, type: "investment", date: "2025-01-12" },
-    ],
-    notifications: [
-    ]
-  })
 
   if (loading) {
     return (
