@@ -209,4 +209,4 @@ __marimo__/
 
 ########### Project Specific ###########
 # Backend
-openbanqr.db
+**/openbanqr.db
